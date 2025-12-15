@@ -139,12 +139,39 @@
             border: 1px solid #f5c6cb;
         }
         
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
         .footer {
             text-align: center;
             padding: 20px;
             color: #666;
             font-size: 0.9em;
             border-top: 1px solid #eee;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         @media (max-width: 768px) {
@@ -179,6 +206,10 @@
         
         <div class="form-container">
             <div id="message" class="result-message"></div>
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>正在提交到GitHub仓库，请稍候...</p>
+            </div>
             
             <form id="coupletForm">
                 <div class="form-group">
@@ -210,103 +241,220 @@
         </div>
         
         <div class="footer">
-            <p>© 2025 对联创作活动 | 作品提交后不可修改</p>
+            <p>© 2025 对联创作活动 | 作品将保存为TXT文件至GitHub仓库</p>
         </div>
     </div>
 
     <script>
-        // 配置信息 - 请根据您的实际GitHub信息修改这些值
+        // ===================== 配置区域 =====================
+        // 重要：请将以下配置修改为您自己的GitHub信息
+        
         const GITHUB_CONFIG = {
             // GitHub用户名
-            username: 'riyueruyi',
+            username: 'YOUR_GITHUB_USERNAME',
+            
             // 仓库名
-            repo: 'complet0',
-            // 存储文件的文件夹路径（默认为submissions文件夹）
+            repo: 'YOUR_REPO_NAME',
+            
+            // 分支名（通常是main或master）
+            branch: 'main',
+            
+            // 存储文件的文件夹路径
             folderPath: 'submissions',
+            
             // GitHub Personal Access Token（需要有repo权限）
             // 重要：在生产环境中，应该使用后端服务器来保护token
-            token: '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'
+            token: 'YOUR_GITHUB_PERSONAL_ACCESS_TOKEN'
         };
         
-        // 格式化当前时间作为文件名的一部分
-        function getFormattedTimestamp() {
+        // ===================== 工具函数 =====================
+        
+        // 显示消息
+        function showMessage(text, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = text;
+            messageDiv.className = `result-message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            // 如果是成功消息，10秒后自动隐藏
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 10000);
+            }
+        }
+        
+        // 显示/隐藏加载动画
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+        
+        // 生成安全的文件名（包含时间戳和姓名）
+        function generateFileName(name) {
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hour = String(now.getHours()).padStart(2, '0');
-            const minute = String(now.getMinutes()).padStart(2, '0');
-            const second = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = now.toISOString()
+                .replace(/[:.]/g, '-')
+                .replace('T', '_')
+                .substring(0, 19);
             
-            return `${year}${month}${day}_${hour}${minute}${second}`;
+            // 清理姓名中的特殊字符，只保留中文、英文、数字和下划线
+            const safeName = name.replace(/[^\w\u4e00-\u9fa5]/g, '_');
+            
+            // 如果姓名为空，使用默认名称
+            const namePart = safeName || 'anonymous';
+            
+            // 添加随机字符串避免重复
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            
+            return `${timestamp}_${namePart}_${randomStr}.txt`;
         }
         
-        // 生成安全的文件名（移除特殊字符）
-        function generateSafeFileName(name) {
-            // 移除可能引起问题的字符，只保留中文、英文、数字和下划线
-            const safeName = name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_]/g, '_');
-            // 如果名字为空或太短，使用默认名称
-            return safeName || 'anonymous';
-        }
-        
-        // 创建要保存的TXT文件内容
-        function createFileContent(submission) {
-            let content = '=== 对联作品提交 ===\n\n';
-            content += `提交时间: ${new Date(submission.timestamp).toLocaleString('zh-CN')}\n`;
-            content += `姓名/昵称: ${submission.name}\n`;
+        // 生成TXT文件内容
+        function generateFileContent(data) {
+            const timestamp = new Date(data.timestamp).toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
             
-            if (submission.classInfo) {
-                content += `学院/班级/学号: ${submission.classInfo}\n`;
+            let content = '对联作品提交记录\n';
+            content += '='.repeat(30) + '\n\n';
+            
+            content += '【提交信息】\n';
+            content += '提交时间：' + timestamp + '\n';
+            content += '作者姓名：' + data.name + '\n';
+            
+            if (data.classInfo && data.classInfo.trim()) {
+                content += '学院班级：' + data.classInfo + '\n';
             }
             
-            content += '\n--- 对联内容 ---\n';
-            content += submission.couplet;
-            content += '\n\n=== 提交结束 ===\n';
+            content += '\n【作品内容】\n';
+            content += '='.repeat(30) + '\n';
+            content += data.couplet + '\n';
+            content += '='.repeat(30) + '\n\n';
+            
+            content += '【系统信息】\n';
+            content += '文件生成时间：' + new Date().toISOString() + '\n';
+            content += '提交方式：GitHub API直接提交\n';
             
             return content;
         }
         
-        // 显示消息
-        function showMessage(text, type) {
-            const messageDiv = document.getElementById('message');
-            messageDiv.textContent = text;
-            messageDiv.className = `result-message ${type}`;
-            messageDiv.style.display = 'block';
-        }
-        
-        // 通过GitHub API提交文件到仓库
-        async function submitToGitHub(submission) {
-            const submitBtn = document.getElementById('submitBtn');
-            
+        // 将字符串编码为Base64（兼容中文）
+        function encodeToBase64(str) {
             try {
-                // 检查配置是否完整
-                if (GITHUB_CONFIG.token.includes('YOUR_') || 
-                    GITHUB_CONFIG.username.includes('YOUR_') || 
-                    GITHUB_CONFIG.repo.includes('YOUR_')) {
-                    throw new Error('请先配置GitHub信息！请修改GITHUB_CONFIG中的值。');
+                // 首先将字符串转换为UTF-8字节数组
+                const utf8Bytes = new TextEncoder().encode(str);
+                
+                // 将字节数组转换为二进制字符串
+                let binaryString = '';
+                for (let i = 0; i < utf8Bytes.length; i++) {
+                    binaryString += String.fromCharCode(utf8Bytes[i]);
                 }
                 
-                // 生成文件名
-                const timestamp = getFormattedTimestamp();
-                const safeName = generateSafeFileName(submission.name);
-                const fileName = `${timestamp}_${safeName}.txt`;
-                const filePath = `${GITHUB_CONFIG.folderPath}/${fileName}`;
-                
-                // 创建文件内容
-                const fileContent = createFileContent(submission);
-                
-                // 准备API请求
+                // 使用btoa进行Base64编码
+                return btoa(binaryString);
+            } catch (error) {
+                console.error('Base64编码失败:', error);
+                // 降级方案：使用旧的unescape/encodeURIComponent方法
+                return btoa(unescape(encodeURIComponent(str)));
+            }
+        }
+        
+        // 验证表单数据
+        function validateFormData(name, couplet) {
+            if (!name || name.trim().length === 0) {
+                return '请输入姓名或昵称';
+            }
+            
+            if (!couplet || couplet.trim().length === 0) {
+                return '请输入对联内容';
+            }
+            
+            if (name.length > 100) {
+                return '姓名或昵称过长（不超过100字符）';
+            }
+            
+            if (couplet.length > 5000) {
+                return '对联内容过长（不超过5000字符）';
+            }
+            
+            // 检查是否包含上下联关键词（可选）
+            const hasShangLian = couplet.includes('上联') || couplet.includes('上联：');
+            const hasXiaLian = couplet.includes('下联') || couplet.includes('下联：');
+            const hasHengPi = couplet.includes('横批') || couplet.includes('横批：');
+            
+            if (!hasShangLian && !hasXiaLian) {
+                // 只是警告，不是错误
+                console.log('提示：对联内容中未明确标注"上联"和"下联"');
+            }
+            
+            return null; // 验证通过
+        }
+        
+        // ===================== GitHub API函数 =====================
+        
+        // 检查文件是否已存在
+        async function checkFileExists(filePath) {
+            try {
                 const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repo}/contents/${filePath}`;
                 
-                // 对内容进行Base64编码（GitHub API要求）
-                const encodedContent = btoa(unescape(encodeURIComponent(fileContent)));
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `token ${GITHUB_CONFIG.token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                return response.status === 200;
+            } catch (error) {
+                console.error('检查文件存在时出错:', error);
+                return false;
+            }
+        }
+        
+        // 创建或更新文件到GitHub仓库
+        async function createOrUpdateFile(filePath, content, commitMessage) {
+            try {
+                const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repo}/contents/${filePath}`;
+                
+                // 检查文件是否已存在，获取sha（用于更新）
+                let sha = null;
+                try {
+                    const checkResponse = await fetch(apiUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `token ${GITHUB_CONFIG.token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+                    
+                    if (checkResponse.ok) {
+                        const existingFile = await checkResponse.json();
+                        sha = existingFile.sha;
+                        console.log('文件已存在，将进行更新，sha:', sha);
+                    }
+                } catch (e) {
+                    // 文件不存在，这是正常情况
+                    console.log('文件不存在，将创建新文件');
+                }
                 
                 // 准备请求数据
                 const requestData = {
-                    message: `添加对联作品: ${submission.name} - ${timestamp}`,
-                    content: encodedContent,
-                    branch: 'main' // 默认分支，根据需要修改
+                    message: commitMessage,
+                    content: encodeToBase64(content),
+                    branch: GITHUB_CONFIG.branch
                 };
+                
+                // 如果文件已存在，添加sha用于更新
+                if (sha) {
+                    requestData.sha = sha;
+                }
                 
                 // 发送请求
                 const response = await fetch(apiUrl, {
@@ -322,65 +470,203 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    // 成功提交到GitHub
-                    console.log('文件已成功提交到GitHub:', result);
-                    showMessage(`✅ 感谢 ${submission.name} 提交作品！文件 "${fileName}" 已保存到GitHub仓库。`, 'success');
+                    console.log('GitHub API响应成功:', result);
+                    return {
+                        success: true,
+                        fileUrl: result.content.html_url,
+                        fileName: filePath.split('/').pop(),
+                        commitSha: result.commit.sha
+                    };
+                } else {
+                    console.error('GitHub API错误:', result);
+                    let errorMessage = '提交失败';
                     
-                    // 保存到本地存储作为备份
-                    saveToLocalStorage(submission);
+                    if (result.message) {
+                        if (result.message.includes('sha')) {
+                            errorMessage = '文件已存在或发生冲突，请稍后重试';
+                        } else if (result.message.includes('invalid')) {
+                            errorMessage = '提交内容格式无效';
+                        } else if (result.message.includes('rate limit')) {
+                            errorMessage = 'API请求次数超限，请稍后再试';
+                        } else {
+                            errorMessage = `GitHub错误: ${result.message}`;
+                        }
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+            } catch (error) {
+                console.error('创建或更新文件失败:', error);
+                throw error;
+            }
+        }
+        
+        // ===================== 提交处理函数 =====================
+        
+        // 保存到本地存储（备用方案）
+        function saveToLocalStorage(data) {
+            try {
+                const submissions = JSON.parse(localStorage.getItem('coupletSubmissions') || '[]');
+                
+                const submissionWithId = {
+                    id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+                    timestamp: new Date().toISOString(),
+                    ...data
+                };
+                
+                submissions.push(submissionWithId);
+                
+                // 限制本地存储数量，最多保存100条
+                if (submissions.length > 100) {
+                    submissions.splice(0, submissions.length - 100);
+                }
+                
+                localStorage.setItem('coupletSubmissions', JSON.stringify(submissions));
+                
+                console.log('数据已保存到本地存储，ID:', submissionWithId.id);
+                return submissionWithId.id;
+            } catch (error) {
+                console.error('本地存储保存失败:', error);
+                return null;
+            }
+        }
+        
+        // 导出本地存储的数据
+        function exportLocalSubmissions() {
+            try {
+                const submissions = JSON.parse(localStorage.getItem('coupletSubmissions') || '[]');
+                
+                if (submissions.length === 0) {
+                    alert('本地没有保存的作品');
+                    return;
+                }
+                
+                // 创建导出内容
+                let exportContent = '本地存储的对联作品备份\n';
+                exportContent += '='.repeat(40) + '\n\n';
+                
+                submissions.forEach((item, index) => {
+                    exportContent += `作品 ${index + 1} (ID: ${item.id})\n`;
+                    exportContent += `保存时间: ${new Date(item.timestamp).toLocaleString('zh-CN')}\n`;
+                    exportContent += `作者: ${item.name}\n`;
+                    
+                    if (item.classInfo) {
+                        exportContent += `班级: ${item.classInfo}\n`;
+                    }
+                    
+                    exportContent += `内容:\n${item.couplet}\n\n`;
+                    exportContent += '-'.repeat(40) + '\n\n';
+                });
+                
+                // 创建下载
+                const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `couplet_backup_${new Date().toISOString().slice(0, 10)}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                console.log('数据导出完成');
+                showMessage(`✅ 已导出 ${submissions.length} 条本地作品`, 'success');
+                
+            } catch (error) {
+                console.error('数据导出失败:', error);
+                showMessage('❌ 导出失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 主提交函数
+        async function submitToGitHub(data) {
+            const submitBtn = document.getElementById('submitBtn');
+            
+            // 禁用提交按钮，防止重复提交
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+            showLoading(true);
+            
+            try {
+                // 1. 验证配置
+                if (GITHUB_CONFIG.token.includes('YOUR_') || 
+                    GITHUB_CONFIG.username.includes('YOUR_') || 
+                    GITHUB_CONFIG.repo.includes('YOUR_')) {
+                    throw new Error('请先配置GitHub信息！请修改GITHUB_CONFIG中的值。');
+                }
+                
+                // 2. 生成文件名和路径
+                const fileName = generateFileName(data.name);
+                const filePath = `${GITHUB_CONFIG.folderPath}/${fileName}`;
+                
+                // 3. 生成文件内容
+                const fileContent = generateFileContent(data);
+                
+                // 4. 提交到GitHub
+                const commitMessage = `添加对联作品: ${data.name}`;
+                const result = await createOrUpdateFile(filePath, fileContent, commitMessage);
+                
+                if (result.success) {
+                    // 5. 显示成功消息
+                    let successMessage = `✅ 感谢 <strong>${data.name}</strong> 提交作品！<br>`;
+                    successMessage += `文件 <strong>"${result.fileName}"</strong> 已保存到GitHub仓库。<br>`;
+                    
+                    // 添加文件链接
+                    if (result.fileUrl) {
+                        successMessage += `<a href="${result.fileUrl}" target="_blank" style="color: #155724; text-decoration: underline;">查看文件</a> | `;
+                    }
+                    
+                    // 添加查看文件夹链接
+                    const folderUrl = `https://github.com/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repo}/tree/main/${GITHUB_CONFIG.folderPath}`;
+                    successMessage += `<a href="${folderUrl}" target="_blank" style="color: #155724; text-decoration: underline;">查看所有作品</a>`;
+                    
+                    showMessage(successMessage, 'success');
+                    
+                    // 6. 保存到本地存储作为备份
+                    saveToLocalStorage(data);
                     
                     return true;
                 } else {
-                    // GitHub API返回错误
-                    console.error('GitHub API错误:', result);
-                    
-                    if (result.message && result.message.includes('sha')) {
-                        // 文件已存在，尝试使用不同的文件名
-                        throw new Error('文件已存在，请稍后重试');
-                    } else {
-                        throw new Error(`GitHub提交失败: ${result.message || '未知错误'}`);
-                    }
+                    throw new Error('提交失败，未知错误');
                 }
                 
             } catch (error) {
                 console.error('提交过程中出错:', error);
                 
                 // 如果GitHub提交失败，保存到本地存储
-                saveToLocalStorage(submission);
-                showMessage(`⚠️ GitHub提交失败，已保存到本地缓存。错误: ${error.message}`, 'error');
+                const localId = saveToLocalStorage(data);
                 
-                // 仍然返回true，因为本地保存成功了
-                return true;
+                // 显示错误消息
+                let errorMessage = `⚠️ GitHub提交失败，已保存到本地缓存。<br>错误: ${error.message}`;
+                
+                if (localId) {
+                    errorMessage += `<br>本地ID: ${localId}`;
+                }
+                
+                showMessage(errorMessage, 'error');
+                
+                return false;
             } finally {
+                // 恢复按钮状态
                 submitBtn.disabled = false;
                 submitBtn.textContent = '提交作品';
+                showLoading(false);
             }
         }
         
-        // 保存到本地存储（备用方案）
-        function saveToLocalStorage(submission) {
-            try {
-                let submissions = JSON.parse(localStorage.getItem('coupletSubmissions') || '[]');
-                submissions.push(submission);
-                localStorage.setItem('coupletSubmissions', JSON.stringify(submissions));
-                console.log('数据已保存到本地存储');
-            } catch (e) {
-                console.error('本地存储保存失败:', e);
-            }
-        }
+        // ===================== 事件监听 =====================
         
-        // 表单提交处理
         document.getElementById('coupletForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const submitBtn = document.getElementById('submitBtn');
             const name = document.getElementById('name').value.trim();
             const couplet = document.getElementById('couplet').value.trim();
             const classInfo = document.getElementById('class').value.trim();
             
             // 验证输入
-            if (!name || !couplet) {
-                showMessage('请填写完整的姓名和对联内容！', 'error');
+            const validationError = validateFormData(name, couplet);
+            if (validationError) {
+                showMessage(`❌ ${validationError}`, 'error');
                 return;
             }
             
@@ -392,10 +678,6 @@
                 timestamp: new Date().toISOString()
             };
             
-            // 禁用提交按钮，防止重复提交
-            submitBtn.disabled = true;
-            submitBtn.textContent = '提交中...';
-            
             // 提交到GitHub
             const success = await submitToGitHub(submission);
             
@@ -403,15 +685,17 @@
                 // 清空表单
                 document.getElementById('coupletForm').reset();
                 
-                // 5秒后隐藏成功消息
+                // 10秒后隐藏成功消息
                 setTimeout(() => {
                     document.getElementById('message').style.display = 'none';
-                }, 5000);
+                }, 10000);
             }
         });
         
-        // 检查页面URL参数（可选功能）
+        // ===================== 页面初始化 =====================
+        
         window.addEventListener('DOMContentLoaded', () => {
+            // 检查URL参数
             const urlParams = new URLSearchParams(window.location.search);
             const fromQR = urlParams.get('fromQR');
             
@@ -424,14 +708,51 @@
             
             // 显示配置提醒（仅开发时使用）
             if (GITHUB_CONFIG.token.includes('YOUR_') || 
-                GITHUB_CONFIG.username.includes('YOUR_')) {
+                GITHUB_CONFIG.username.includes('YOUR_') || 
+                GITHUB_CONFIG.repo.includes('YOUR_')) {
                 console.warn('⚠️ 请先配置GITHUB_CONFIG中的值！');
                 showMessage('⚠️ 开发提示：请配置GitHub API信息以启用提交功能', 'error');
                 setTimeout(() => {
                     document.getElementById('message').style.display = 'none';
                 }, 5000);
             }
+            
+            // 检查本地存储
+            try {
+                const submissions = JSON.parse(localStorage.getItem('coupletSubmissions') || '[]');
+                if (submissions.length > 0) {
+                    console.log(`本地保存了 ${submissions.length} 条作品`);
+                    
+                    // 如果有未同步的作品，显示提示
+                    const unsyncedCount = submissions.length;
+                    if (unsyncedCount > 0) {
+                        console.log(`有 ${unsyncedCount} 条本地保存的作品`);
+                    }
+                }
+            } catch (error) {
+                console.error('检查本地存储失败:', error);
+            }
+            
+            // 添加管理功能到控制台
+            console.log('对联收集系统已加载');
+            console.log('可用管理函数: exportLocalSubmissions()');
         });
+        
+        // 添加键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+Shift+E 导出本地数据
+            if (e.ctrlKey && e.shiftKey && e.key === 'E') {
+                e.preventDefault();
+                exportLocalSubmissions();
+            }
+            
+            // Ctrl+Enter 提交表单
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('submitBtn').click();
+            }
+        });
+        
     </script>
 </body>
 </html>
