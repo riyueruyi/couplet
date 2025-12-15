@@ -1,9 +1,151 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <title>测试页面</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>对联创作收集</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", sans-serif; padding: 20px; background: #f5f7fa; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        h1 { text-align: center; margin-bottom: 30px; color: #333; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        textarea { height: 150px; }
+        button { background: #007bff; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .message { padding: 15px; margin: 15px 0; border-radius: 5px; display: none; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
 </head>
 <body>
-    <h1>Hello World!</h1>
+    <div class="container">
+        <h1>对联创作收集</h1>
+        <div id="message" class="message"></div>
+        
+        <form id="coupletForm">
+            <div class="form-group">
+                <label>姓名/昵称：</label>
+                <input type="text" id="name" required placeholder="请输入姓名">
+            </div>
+            
+            <div class="form-group">
+                <label>创作的对联：</label>
+                <textarea id="couplet" required placeholder="请输入对联内容"></textarea>
+                <small style="color: #666;">示例：上联：XXX 下联：XXX 横批：XXX</small>
+            </div>
+            
+            <div class="form-group">
+                <label>学院/班级/学号：</label>
+                <input type="text" id="class" placeholder="选填">
+            </div>
+            
+            <button type="submit" id="submitBtn">提交作品</button>
+        </form>
+    </div>
+
+    <script>
+        // ===================== 请修改这里的配置 =====================
+        const CONFIG = {
+            username: 'riyueruyi',    // 改成您的GitHub用户名
+            repo: 'couplet',              // 改成您的仓库名
+            token: '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'           // 改成您的GitHub Token
+        };
+        // ===================== 配置结束 =====================
+
+        // 显示消息
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = 'message ' + type;
+            msg.style.display = 'block';
+        }
+
+        // 表单提交处理
+        document.getElementById('coupletForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('name').value.trim();
+            const couplet = document.getElementById('couplet').value.trim();
+            const classInfo = document.getElementById('class').value.trim();
+            
+            if (!name || !couplet) {
+                showMessage('请填写姓名和对联内容！', 'error');
+                return;
+            }
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+            
+            try {
+                // 检查配置
+                if (CONFIG.username.includes('YOUR_') || CONFIG.repo.includes('YOUR_') || CONFIG.token.includes('YOUR_')) {
+                    throw new Error('请先配置GitHub信息！');
+                }
+                
+                // 准备数据
+                const data = {
+                    name: name,
+                    couplet: couplet,
+                    classInfo: classInfo,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // 生成文件名
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+                const random = Math.random().toString(36).substring(2, 8);
+                const fileName = `${timestamp}_${name.substring(0, 10)}_${random}.txt`;
+                
+                // 创建文件内容
+                const content = `对联作品提交\n\n作者：${name}\n时间：${new Date().toLocaleString('zh-CN')}\n班级：${classInfo || '未填写'}\n\n${couplet}`;
+                
+                // Base64编码
+                const encodedContent = btoa(unescape(encodeURIComponent(content)));
+                
+                // GitHub API URL
+                const apiUrl = `https://api.github.com/repos/${CONFIG.username}/${CONFIG.repo}/contents/submissions/${fileName}`;
+                
+                // 发送请求
+                const response = await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${CONFIG.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `添加对联作品：${name}`,
+                        content: encodedContent,
+                        branch: 'main'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`✅ 提交成功！作品已保存为 ${fileName}`, 'success');
+                    document.getElementById('coupletForm').reset();
+                } else {
+                    throw new Error(result.message || '提交失败');
+                }
+                
+            } catch (error) {
+                console.error('提交错误:', error);
+                showMessage(`❌ 提交失败：${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '提交作品';
+            }
+        });
+        
+        // 页面加载时检查配置
+        window.addEventListener('load', function() {
+            if (CONFIG.username.includes('YOUR_')) {
+                showMessage('⚠️ 请先配置GitHub信息！', 'error');
+            }
+        });
+    </script>
 </body>
 </html>
