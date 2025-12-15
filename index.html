@@ -5,145 +5,431 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>对联创作收集</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: "Microsoft YaHei", sans-serif; padding: 20px; background: #f5f7fa; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-        h1 { text-align: center; margin-bottom: 30px; color: #333; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        textarea { height: 150px; }
-        button { background: #007bff; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .message { padding: 15px; margin: 15px 0; border-radius: 5px; display: none; }
-        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .form-container {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1em;
+        }
+        
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus, textarea:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: inherit;
+            line-height: 1.6;
+        }
+        
+        .couplet-example {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-style: italic;
+            color: #666;
+            border-left: 4px solid #667eea;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            display: block;
+            margin: 40px auto 0;
+            transition: transform 0.3s, box-shadow 0.3s;
+            font-weight: bold;
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-message {
+            text-align: center;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+            border-top: 1px solid #eee;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                border-radius: 10px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .form-container {
+                padding: 25px;
+            }
+            
+            .submit-btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>对联创作收集</h1>
-        <div id="message" class="message"></div>
+        <div class="header">
+            <h1>🎨 对联创作征集</h1>
+            <p>挥毫泼墨，展现你的才华！</p>
+        </div>
         
-        <form id="coupletForm">
-            <div class="form-group">
-                <label>姓名/昵称：</label>
-                <input type="text" id="name" required placeholder="请输入姓名">
-            </div>
+        <div class="form-container">
+            <div id="message" class="result-message"></div>
             
-            <div class="form-group">
-                <label>创作的对联：</label>
-                <textarea id="couplet" required placeholder="请输入对联内容"></textarea>
-                <small style="color: #666;">示例：上联：XXX 下联：XXX 横批：XXX</small>
-            </div>
-            
-            <div class="form-group">
-                <label>学院/班级/学号：</label>
-                <input type="text" id="class" placeholder="选填">
-            </div>
-            
-            <button type="submit" id="submitBtn">提交作品</button>
-        </form>
+            <form id="coupletForm">
+                <div class="form-group">
+                    <label for="name">📝 姓名/昵称：</label>
+                    <input type="text" id="name" name="name" required 
+                           placeholder="请输入您的姓名">
+                </div>
+                
+                <div class="form-group">
+                    <label for="couplet">🖋️ 创作的对联：</label>
+                    <textarea id="couplet" name="couplet" required 
+                              placeholder="请输入您创作的对联（上下联和横批）"></textarea>
+                    <div class="couplet-example">
+                        示例：<br>
+                        上联：春满人间百花吐艳<br>
+                        下联：福临小院四季常安<br>
+                        横批：欢度春节
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="class">🏫 学院/班级/学号：</label>
+                    <input type="text" id="class" name="class" 
+                           placeholder="例如：地空学院06D255班12345678912">
+                </div>
+                
+                <button type="submit" class="submit-btn" id="submitBtn">提交作品</button>
+            </form>
+        </div>
+        
+        <div class="footer">
+            <p>© 2025 对联创作活动 | 作品提交后不可修改</p>
+        </div>
     </div>
 
     <script>
-        // ===================== 请修改这里的配置 =====================
-        const CONFIG = {
-            username: 'riyueruyi',    // 改成您的GitHub用户名
-            repo: 'couplet',              // 改成您的仓库名
-            token: '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'           // 改成您的GitHub Token
+        // 配置信息 - 请根据您的实际GitHub信息修改这些值
+        const GITHUB_CONFIG = {
+            // GitHub用户名
+            username: 'riyueruyi',
+            // 仓库名
+            repo: 'complet0',
+            // 存储文件的文件夹路径（默认为submissions文件夹）
+            folderPath: 'submissions',
+            // GitHub Personal Access Token（需要有repo权限）
+            // 重要：在生产环境中，应该使用后端服务器来保护token
+            token: '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'
         };
-        // ===================== 配置结束 =====================
-
-        // 显示消息
-        function showMessage(text, type) {
-            const msg = document.getElementById('message');
-            msg.textContent = text;
-            msg.className = 'message ' + type;
-            msg.style.display = 'block';
+        
+        // 格式化当前时间作为文件名的一部分
+        function getFormattedTimestamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hour = String(now.getHours()).padStart(2, '0');
+            const minute = String(now.getMinutes()).padStart(2, '0');
+            const second = String(now.getSeconds()).padStart(2, '0');
+            
+            return `${year}${month}${day}_${hour}${minute}${second}`;
         }
-
-        // 表单提交处理
-        document.getElementById('coupletForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        
+        // 生成安全的文件名（移除特殊字符）
+        function generateSafeFileName(name) {
+            // 移除可能引起问题的字符，只保留中文、英文、数字和下划线
+            const safeName = name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_]/g, '_');
+            // 如果名字为空或太短，使用默认名称
+            return safeName || 'anonymous';
+        }
+        
+        // 创建要保存的TXT文件内容
+        function createFileContent(submission) {
+            let content = '=== 对联作品提交 ===\n\n';
+            content += `提交时间: ${new Date(submission.timestamp).toLocaleString('zh-CN')}\n`;
+            content += `姓名/昵称: ${submission.name}\n`;
             
-            const name = document.getElementById('name').value.trim();
-            const couplet = document.getElementById('couplet').value.trim();
-            const classInfo = document.getElementById('class').value.trim();
-            
-            if (!name || !couplet) {
-                showMessage('请填写姓名和对联内容！', 'error');
-                return;
+            if (submission.classInfo) {
+                content += `学院/班级/学号: ${submission.classInfo}\n`;
             }
             
+            content += '\n--- 对联内容 ---\n';
+            content += submission.couplet;
+            content += '\n\n=== 提交结束 ===\n';
+            
+            return content;
+        }
+        
+        // 显示消息
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `result-message ${type}`;
+            messageDiv.style.display = 'block';
+        }
+        
+        // 通过GitHub API提交文件到仓库
+        async function submitToGitHub(submission) {
             const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = '提交中...';
             
             try {
-                // 检查配置
-                if (CONFIG.username.includes('YOUR_') || CONFIG.repo.includes('YOUR_') || CONFIG.token.includes('YOUR_')) {
-                    throw new Error('请先配置GitHub信息！');
+                // 检查配置是否完整
+                if (GITHUB_CONFIG.token.includes('YOUR_') || 
+                    GITHUB_CONFIG.username.includes('YOUR_') || 
+                    GITHUB_CONFIG.repo.includes('YOUR_')) {
+                    throw new Error('请先配置GitHub信息！请修改GITHUB_CONFIG中的值。');
                 }
                 
-                // 准备数据
-                const data = {
-                    name: name,
-                    couplet: couplet,
-                    classInfo: classInfo,
-                    timestamp: new Date().toISOString()
-                };
-                
                 // 生成文件名
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-                const random = Math.random().toString(36).substring(2, 8);
-                const fileName = `${timestamp}_${name.substring(0, 10)}_${random}.txt`;
+                const timestamp = getFormattedTimestamp();
+                const safeName = generateSafeFileName(submission.name);
+                const fileName = `${timestamp}_${safeName}.txt`;
+                const filePath = `${GITHUB_CONFIG.folderPath}/${fileName}`;
                 
                 // 创建文件内容
-                const content = `对联作品提交\n\n作者：${name}\n时间：${new Date().toLocaleString('zh-CN')}\n班级：${classInfo || '未填写'}\n\n${couplet}`;
+                const fileContent = createFileContent(submission);
                 
-                // Base64编码
-                const encodedContent = btoa(unescape(encodeURIComponent(content)));
+                // 准备API请求
+                const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repo}/contents/${filePath}`;
                 
-                // GitHub API URL
-                const apiUrl = `https://api.github.com/repos/${CONFIG.username}/${CONFIG.repo}/contents/submissions/${fileName}`;
+                // 对内容进行Base64编码（GitHub API要求）
+                const encodedContent = btoa(unescape(encodeURIComponent(fileContent)));
+                
+                // 准备请求数据
+                const requestData = {
+                    message: `添加对联作品: ${submission.name} - ${timestamp}`,
+                    content: encodedContent,
+                    branch: 'main' // 默认分支，根据需要修改
+                };
                 
                 // 发送请求
                 const response = await fetch(apiUrl, {
                     method: 'PUT',
                     headers: {
-                        'Authorization': `token ${CONFIG.token}`,
-                        'Content-Type': 'application/json'
+                        'Authorization': `token ${GITHUB_CONFIG.token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/vnd.github.v3+json'
                     },
-                    body: JSON.stringify({
-                        message: `添加对联作品：${name}`,
-                        content: encodedContent,
-                        branch: 'main'
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showMessage(`✅ 提交成功！作品已保存为 ${fileName}`, 'success');
-                    document.getElementById('coupletForm').reset();
+                    // 成功提交到GitHub
+                    console.log('文件已成功提交到GitHub:', result);
+                    showMessage(`✅ 感谢 ${submission.name} 提交作品！文件 "${fileName}" 已保存到GitHub仓库。`, 'success');
+                    
+                    // 保存到本地存储作为备份
+                    saveToLocalStorage(submission);
+                    
+                    return true;
                 } else {
-                    throw new Error(result.message || '提交失败');
+                    // GitHub API返回错误
+                    console.error('GitHub API错误:', result);
+                    
+                    if (result.message && result.message.includes('sha')) {
+                        // 文件已存在，尝试使用不同的文件名
+                        throw new Error('文件已存在，请稍后重试');
+                    } else {
+                        throw new Error(`GitHub提交失败: ${result.message || '未知错误'}`);
+                    }
                 }
                 
             } catch (error) {
-                console.error('提交错误:', error);
-                showMessage(`❌ 提交失败：${error.message}`, 'error');
+                console.error('提交过程中出错:', error);
+                
+                // 如果GitHub提交失败，保存到本地存储
+                saveToLocalStorage(submission);
+                showMessage(`⚠️ GitHub提交失败，已保存到本地缓存。错误: ${error.message}`, 'error');
+                
+                // 仍然返回true，因为本地保存成功了
+                return true;
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = '提交作品';
             }
+        }
+        
+        // 保存到本地存储（备用方案）
+        function saveToLocalStorage(submission) {
+            try {
+                let submissions = JSON.parse(localStorage.getItem('coupletSubmissions') || '[]');
+                submissions.push(submission);
+                localStorage.setItem('coupletSubmissions', JSON.stringify(submissions));
+                console.log('数据已保存到本地存储');
+            } catch (e) {
+                console.error('本地存储保存失败:', e);
+            }
+        }
+        
+        // 表单提交处理
+        document.getElementById('coupletForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const name = document.getElementById('name').value.trim();
+            const couplet = document.getElementById('couplet').value.trim();
+            const classInfo = document.getElementById('class').value.trim();
+            
+            // 验证输入
+            if (!name || !couplet) {
+                showMessage('请填写完整的姓名和对联内容！', 'error');
+                return;
+            }
+            
+            // 准备提交数据
+            const submission = {
+                name: name,
+                couplet: couplet,
+                classInfo: classInfo,
+                timestamp: new Date().toISOString()
+            };
+            
+            // 禁用提交按钮，防止重复提交
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+            
+            // 提交到GitHub
+            const success = await submitToGitHub(submission);
+            
+            if (success) {
+                // 清空表单
+                document.getElementById('coupletForm').reset();
+                
+                // 5秒后隐藏成功消息
+                setTimeout(() => {
+                    document.getElementById('message').style.display = 'none';
+                }, 5000);
+            }
         });
         
-        // 页面加载时检查配置
-        window.addEventListener('load', function() {
-            if (CONFIG.username.includes('YOUR_')) {
-                showMessage('⚠️ 请先配置GitHub信息！', 'error');
+        // 检查页面URL参数（可选功能）
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromQR = urlParams.get('fromQR');
+            
+            if (fromQR === 'true') {
+                showMessage('📱 欢迎通过扫码访问对联创作页面！请填写您的作品。', 'success');
+                setTimeout(() => {
+                    document.getElementById('message').style.display = 'none';
+                }, 3000);
+            }
+            
+            // 显示配置提醒（仅开发时使用）
+            if (GITHUB_CONFIG.token.includes('YOUR_') || 
+                GITHUB_CONFIG.username.includes('YOUR_')) {
+                console.warn('⚠️ 请先配置GITHUB_CONFIG中的值！');
+                showMessage('⚠️ 开发提示：请配置GitHub API信息以启用提交功能', 'error');
+                setTimeout(() => {
+                    document.getElementById('message').style.display = 'none';
+                }, 5000);
             }
         });
     </script>
